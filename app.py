@@ -17,7 +17,7 @@ engine = create_engine(db_url)
 def test_connection():
     try:
         with engine.connect() as conn:
-            query = text("SELECT * FROM loancamdata LIMIT 5")
+            query = text("SELECT * FROM loancamd LIMIT 5")
             result = conn.execute(query)
             df = pd.DataFrame(result.fetchall(), columns=result.keys())
             return df
