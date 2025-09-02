@@ -1,0 +1,8 @@
+streamlit
+pandas
+sqlalchemy
+psycopg2-binary   # if you use PostgreSQL
+requests
+shap               # if you’re using SHAP
+dice-ml            # if using DiCE
+matplotlib
