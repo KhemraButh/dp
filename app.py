@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 DB_PATH = "loancam.db"
-CSV_PATH = "loancam.csv"  # optional CSV with data to populate
+CSV_PATH = "loancamdata.csv"  # optional CSV with data to populate
 
 # -----------------------------
 # Define table columns and types
