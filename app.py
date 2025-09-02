@@ -25,17 +25,19 @@ def generate_llm_advice(changes: list, loan_type: str) -> str:
     prompt = f"""You are a financial advisor helping {loan_type} loan applicants.
 Changes: {"; ".join(changes)}
 Explain how these changes improve approval chances."""
-    
+
+    API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+    headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+
     try:
-        response = requests.post(
-            f"https://api-inference.huggingface.co/models/{HF_MODEL}",
-            headers={"Authorization": f"Bearer {HF_API_TOKEN}"},
-            json={"inputs": prompt}
-        )
+        response = requests.post(API_URL, headers=headers, json={"inputs": prompt})
         if response.status_code == 200:
             result = response.json()
-            if isinstance(result, list) and "generated_text" in result[0]:
+            # Hugging Face often returns [{"generated_text": "..."}]
+            if isinstance(result, list) and len(result) > 0 and "generated_text" in result[0]:
                 return result[0]["generated_text"]
+            elif isinstance(result, dict) and "error" in result:
+                return f"HF API Error: {result['error']}"
             else:
                 return str(result)
         else:
