@@ -1,81 +1,68 @@
 import streamlit as st
 import sqlite3
-import os
 import pandas as pd
+from sqlalchemy import create_engine
+import requests
+import os
 
+# -------------------------
+# Database
+# -------------------------
 DB_PATH = "loancam.db"
-CSV_PATH = "loancamdata.csv"  # Make sure this file is in the repo/folder
 
-st.title("📊 LoanCam SQLite Database Test & Init")
+if not os.path.exists(DB_PATH):
+    st.error("Database not found. Place 'loancam.db' in the folder.")
+else:
+    engine = create_engine(f"sqlite:///{DB_PATH}")
 
-# -----------------------------
-# Initialize Database
-# -----------------------------
-if st.button("Initialize Database"):
-    if not os.path.exists(DB_PATH):
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.cursor()
+# -------------------------
+# Hugging Face LLaMA API
+# -------------------------
+HF_API_TOKEN = st.secrets["HF_API_TOKEN"]
+HF_MODEL = "meta-llama/Llama-3.1-8B"
 
-        # Define columns and types
-        columns = {
-            "Application_ID": "TEXT",
-            "Full_Name": "TEXT",
-            "Age": "INTEGER",
-            "Location": "TEXT",
-            "Date": "TEXT",
-            "Loan_Type": "TEXT",
-            "Marital_Status": "TEXT",
-            "Collateral_Type": "TEXT",
-            "Collateral_Value": "REAL",
-            "Employee_Status": "TEXT",
-            "Income": "REAL",
-            "Loan_Term": "INTEGER",
-            "Loan_Amount": "REAL",
-            "Monthly_Payment": "REAL",
-            "Debt": "REAL",
-            "Dti": "REAL",
-            "LVR": "REAL",
-            "Guarantor": "TEXT",
-            "Customer_Status": "TEXT",
-            "Customer_Relation": "TEXT",
-            "Interest_Rate": "REAL",
-            "Loan_Reason": "TEXT",
-            "Credit_History": "INTEGER",
-            "Loan_Status": "TEXT",
-            "Loan_Binary_Status": "INTEGER",
-            "Guarantor_Binary": "INTEGER",
-            "Customer_Status_Encoded": "REAL",
-            "RM_Code": "TEXT",
-            "id_card": "TEXT",
-            "land_plan": "TEXT"
-        }
-
-        # Create table
-        columns_sql = ", ".join([f"{col} {dtype}" for col, dtype in columns.items()])
-        create_table_sql = f"CREATE TABLE loancamdata ({columns_sql});"
-        cur.execute(create_table_sql)
-        conn.commit()
-
-        # Load CSV if exists
-        if os.path.exists(CSV_PATH):
-            df = pd.read_csv(CSV_PATH)
-            df.to_sql("loancamdata", conn, if_exists="replace", index=False)
-            st.success(f"Database created and loaded from {CSV_PATH}")
+def generate_llm_advice(changes: list, loan_type: str) -> str:
+    prompt = f"""You are a financial advisor helping {loan_type} loan applicants.
+Changes: {"; ".join(changes)}
+Explain how these changes improve approval chances."""
+    
+    try:
+        response = requests.post(
+            f"https://api-inference.huggingface.co/models/{HF_MODEL}",
+            headers={"Authorization": f"Bearer {HF_API_TOKEN}"},
+            json={"inputs": prompt}
+        )
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and "generated_text" in result[0]:
+                return result[0]["generated_text"]
+            else:
+                return str(result)
         else:
-            st.success(f"Database created at {DB_PATH} with empty table 'loancamdata'")
+            return f"HF API error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"AI Advice could not be generated due to: {str(e)}"
 
-        conn.close()
-    else:
-        st.info(f"Database {DB_PATH} already exists.")
+# -------------------------
+# Streamlit UI
+# -------------------------
+st.title("Loan Approval Test App")
 
-# -----------------------------
-# Test Database Connection
-# -----------------------------
-if st.button("Test Database"):
-    if os.path.exists(DB_PATH):
-        conn = sqlite3.connect(DB_PATH)
-        df = pd.read_sql("SELECT * FROM loancamdata LIMIT 5;", conn)
-        st.dataframe(df)
-        conn.close()
+if st.button("Test DB Connection"):
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql("SELECT * FROM loancamdata LIMIT 5", conn)
+            st.success("✅ Connected to database!")
+            st.dataframe(df)
+    except Exception as e:
+        st.error(f"DB Error: {str(e)}")
+
+st.subheader("Generate LLM Advice")
+changes = st.text_area("Enter changes (comma-separated)").split(",")
+loan_type = st.selectbox("Loan Type", ["Personal Loan", "Home Loan", "SME Loan"])
+if st.button("Generate Advice"):
+    if changes:
+        advice = generate_llm_advice(changes, loan_type)
+        st.write(advice)
     else:
-        st.error("Database not found. Please initialize it first.")
+        st.warning("Please enter some changes.")
