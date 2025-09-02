@@ -1,41 +1,68 @@
-# app.py
-import streamlit as st
-import pandas as pd
 import sqlite3
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
+import os
+import pandas as pd
 
-# -------------------------------
-# Database connection (SQLite file)
-# -------------------------------
-db_url = "sqlite:///loancam.db"  # SQLite DB file in the same folder
-engine = create_engine(db_url)
+DB_PATH = "loancam.db"
+CSV_PATH = "loancam.csv"  # optional CSV with data to populate
 
-# -------------------------------
-# Function to test DB query
-# -------------------------------
-def test_connection():
-    try:
-        with engine.connect() as conn:
-            query = text("SELECT * FROM loancamdata LIMIT 5") 
-            result = conn.execute(query)
-            df = pd.DataFrame(result.fetchall(), columns=result.keys())
-            return df
-    except SQLAlchemyError as e:
-        st.error(f"Database error: {str(e)}")
-        return pd.DataFrame()
+# -----------------------------
+# Define table columns and types
+# -----------------------------
+columns = {
+    "Application_ID": "TEXT",
+    "Full_Name": "TEXT",
+    "Age": "INTEGER",
+    "Location": "TEXT",
+    "Date": "TEXT",
+    "Loan_Type": "TEXT",
+    "Marital_Status": "TEXT",
+    "Collateral_Type": "TEXT",
+    "Collateral_Value": "REAL",
+    "Employee_Status": "TEXT",
+    "Income": "REAL",
+    "Loan_Term": "INTEGER",
+    "Loan_Amount": "REAL",
+    "Monthly_Payment": "REAL",
+    "Debt": "REAL",
+    "Dti": "REAL",
+    "LVR": "REAL",
+    "Guarantor": "TEXT",
+    "Customer_Status": "TEXT",
+    "Customer_Relation": "TEXT",
+    "Interest_Rate": "REAL",
+    "Loan_Reason": "TEXT",
+    "Credit_History": "INTEGER",
+    "Loan_Status": "TEXT",
+    "Loan_Binary_Status": "INTEGER",
+    "Guarantor_Binary": "INTEGER",
+    "Customer_Status_Encoded": "REAL",
+    "RM_Code": "TEXT",
+    "id_card": "TEXT",
+    "land_plan": "TEXT"
+}
 
-# -------------------------------
-# Streamlit Interface
-# -------------------------------
-st.title("🔗 SQLite Database Connectivity Test")
+# -----------------------------
+# Create DB if it doesn't exist
+# -----------------------------
+if not os.path.exists(DB_PATH):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
 
-st.write("This small app tests if the SQLite database connection works correctly.")
+    # Build CREATE TABLE SQL
+    columns_sql = ", ".join([f"{col} {dtype}" for col, dtype in columns.items()])
+    create_table_sql = f"CREATE TABLE loancamdata ({columns_sql});"
+    cur.execute(create_table_sql)
+    conn.commit()
+    print(f"Database created at {DB_PATH} with table 'loancamdata'.")
 
-if st.button("Test DB Connection"):
-    df = test_connection()
-    if not df.empty:
-        st.success("✅ Successfully connected to SQLite database!")
-        st.dataframe(df)
-    else:
-        st.error("❌ Could not retrieve data from the SQLite database.")
+    # -----------------------------
+    # Optionally populate from CSV
+    # -----------------------------
+    if os.path.exists(CSV_PATH):
+        df = pd.read_csv(CSV_PATH)
+        df.to_sql("loancamdata", conn, if_exists="replace", index=False)
+        print(f"Data loaded from {CSV_PATH} into 'loancamdata'.")
+    
+    conn.close()
+else:
+    print(f"Database {DB_PATH} already exists.")
