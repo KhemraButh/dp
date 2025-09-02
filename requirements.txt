@@ -6,3 +6,4 @@ requests
 shap               # if you’re using SHAP
 dice-ml            # if using DiCE
 matplotlib
+replicate
